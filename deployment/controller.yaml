@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-cleaner-controller
+  namespace: monitor
+  labels:
+    app: gpu-cleaner-controller
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: gpu-cleaner-controller
+  template:
+    metadata:
+      labels:
+        app: gpu-cleaner-controller
+    spec:
+      serviceAccountName: gpu-cleaner-controller
+      containers:
+      - name: gpu-cleaner-controller
+        image: registry.datexis.com/pgrundmann/gpu-idle-controller:0.1
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            memory: "1Gi"
+      imagePullSecrets:
+        - name: private-registry-auth
