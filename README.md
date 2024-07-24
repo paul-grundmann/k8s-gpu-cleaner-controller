@@ -13,7 +13,7 @@ This helps in maximizing the availability of GPU resources for active workloads 
 
 ## Installation
 
-### Build Dockerimage from source
+### Build the docker image from source
 ``` 
 git clone https://github.com/paul-grundmann/k8s-gpu-cleaner-controller.git .
 cd k8s-gpu-cleaner-controller/
