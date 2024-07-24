@@ -1,10 +1,11 @@
 import os
 import time
-
+from datetime import datetime
 from kubernetes import client, config
 from kubernetes.client import AppsV1Api
 from prometheus_api_client import PrometheusConnect
 import logging
+from pytimeparse.timeparse import timeparse
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +38,27 @@ def main():
             pod_name = metric["metric"]["pod"]
             namespace = metric["metric"]["namespace"]
             value = float(metric["value"][1])
-            if value > 0.01:
+            pod = core_v1.read_namespaced_pod(pod_name, namespace)
+            owner_references = pod.metadata.owner_references
+
+            if FORBID_DELETE_LABEL in pod.metadata.labels:
+                logger.info(f"Dont delete: {pod_name} because it has the {FORBID_DELETE_LABEL} label")
                 continue
 
-            test = core_v1.read_namespaced_pod(pod_name, namespace)
-            owner_references = test.metadata.owner_references
+            if value > 0.01:
+                logger.info(f"Dont delete: {pod_name} because it uses the GPU")
+                continue
+            try:
+                started_at_timestamp = pod.status.container_statuses[0].state.running.started_at
+                started_at_timestamp = started_at_timestamp.replace(tzinfo=None)
+                current_time = datetime.now()
+                running_time = current_time - started_at_timestamp
+                if running_time.seconds < timeparse(gpu_utilization_average_interval):
+                    # ignore pod until the container runs for at least
+                    logger.info(f"Dont delete: {pod_name} because it runs shorter than {gpu_utilization_average_interval}")
+                    continue
+            except:
+                logger.error(f"Could not get started-timestamp of pod: {pod_name}")
 
             if owner_references is not None:
                 # get replicaset, deployment or job
@@ -49,30 +66,15 @@ def main():
                     replicaset = apps_v1.read_namespaced_replica_set(owner_references[0].name, namespace)
                     deployment_name = replicaset.metadata.owner_references[0].name
                     logger.info(f"Shall delete Deployment: {deployment_name}")
-                    # delete deployment object
 
-                    pass
-                    # get replicaset owner_references
                 elif owner_references[0].kind == "Job":
                     # delete job object
                     job_name = owner_references[0].name
                     logger.info(f"Shall delete Job: {job_name}")
-                    a = 0
             else:
                 # delete pod directly
                 logger.info(f"Shall delete pod: {pod_name}")
-                pass
         time.sleep(10)
-
-
-# Program Loop:
-# 1. Query all pods consuming a GPU, exported via dcgm_exporter
-# 2. Exclude all pods from a configmap / with an annotation from further processing
-# 3. Get average GPU utilization over 1h
-# 3a) if avg by (pod) (avg_over_time(dcgm_gpu_utilization[10m])) if pod is 0 -> Check:
-# 4) Get the deployment / job of the pod if it is not a single pod
-# 5) Delete the respective resource (Deployment, Job or Pod)
-
 
 if __name__ == "__main__":
     main()
