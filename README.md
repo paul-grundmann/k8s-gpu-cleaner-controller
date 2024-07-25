@@ -18,22 +18,25 @@ This helps in maximizing the availability of GPU resources for active workloads 
 git clone https://github.com/paul-grundmann/k8s-gpu-cleaner-controller.git .
 cd k8s-gpu-cleaner-controller/
 docker buildx build --push --platform linux/amd64 -t  registry.datexis.com/pgrundmann/gpu-cleaner-controller:0.1 .
-kubectl create -f deployment/rbac.yaml deployment/controller.yaml
+kubectl create -f deployment/
 ```
 
 ## Configuration
 
 The GPU Resource Manager can be configured using environment variables:
-
+```sh
     GPU_UTIL_INTERVAL: The interval used to decide whether to delete workloads if idle (default is 1h).
     IMPORTANT_WORKLOADS: Comma-separated list of workload names that should not be deleted.
     FORBID_DELETE_LABEL: The label used to mark workloads that should not be deleted automatically.
+    LOGLEVEL: The loglevel used, default is INFO
+    LOCAL_DEV: Set to 1 if you work locally. Required to decide from where to load the kubernetes client config
+```
 
 ### Example:
-```
+```sh
 GPU_UTIL_INTERVAL="1h"
-export IMPORTANT_WORKLOADS="important-deployment-1,important-deployment-2"
-export FORBID_DELETE_LABEL="do-not-delete"
+IMPORTANT_WORKLOADS="important-deployment-1,important-deployment-2"
+FORBID_DELETE_LABEL="do-not-delete"
 ```
 
 Contributing
