@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: gpu-cleaner-controller 
-  namespace: monitor 
+  namespace: gpu-cleaner-controller
 
 ---
 
@@ -13,13 +13,13 @@ metadata:
 rules:
 - apiGroups: ["apps"]
   resources: ["deployments", "replicasets"]
-  verbs: ["list", "delete"]
+  verbs: ["get", "list", "delete"]
 - apiGroups: ["batch"]
   resources: ["jobs"]
-  verbs: ["list", "delete"]
+  verbs: ["get", "list", "delete"]
 - apiGroups: [""]
   resources: ["pods"]
-  verbs: ["list", "delete"]
+  verbs: ["get", "list", "delete"]
 
 ---
 
@@ -33,5 +33,5 @@ roleRef:
   kind: ClusterRole
 subjects:
 - kind: ServiceAccount
-  namespace: monitor
+  namespace: gpu-cleaner-controller
   name: gpu-cleaner-controller

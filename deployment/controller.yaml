@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gpu-cleaner-controller
-  namespace: monitor
+  namespace: gpu-cleaner-controller
   labels:
     app: gpu-cleaner-controller
 spec:
@@ -20,7 +20,10 @@ spec:
       serviceAccountName: gpu-cleaner-controller
       containers:
       - name: gpu-cleaner-controller
-        image: registry.datexis.com/pgrundmann/gpu-idle-controller:0.1
+        image: registry.datexis.com/pgrundmann/gpu-idle-controller:0.2.13
+        env:
+        - name: LOGLEVEL
+          value: "INFO"
         resources:
           requests:
             cpu: "100m"
