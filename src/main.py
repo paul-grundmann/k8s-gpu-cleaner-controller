@@ -36,10 +36,10 @@ def main():
 
     while True:
         gpu_util_over_interval = prom.custom_query(
-            query=f"avg by (pod, namespace) (avg_over_time(dcgm_gpu_utilization[{gpu_utilization_average_interval}]))")
+            query=f"avg by (pod, namespace, gpu) (avg_over_time(dcgm_gpu_utilization[{gpu_utilization_average_interval}]))")
 
         # remove empty metrics
-        gpu_util_over_interval = list(filter(lambda x: len(x["metric"]) > 0, gpu_util_over_interval))
+        gpu_util_over_interval = list(filter(lambda x: "pod" in x["metric"], gpu_util_over_interval))
 
         # get deployments or jobs for the pods if they exist
         # kubectl describe pod "podname"
@@ -47,7 +47,11 @@ def main():
             pod_name = metric["metric"]["pod"]
             namespace = metric["metric"]["namespace"]
             value = float(metric["value"][1])
-            pod = core_v1.read_namespaced_pod(pod_name, namespace)
+            try:
+                pod = core_v1.read_namespaced_pod(pod_name, namespace)
+            except Exception as e:
+                logger.error(f"Exception while trying to get pod resource of pod {pod_name}. Exception: {e}")
+                continue
             owner_references = pod.metadata.owner_references
 
             if pod.metadata.labels is not None:
@@ -76,8 +80,12 @@ def main():
             if owner_references is not None:
                 # get replicaset, deployment or job
                 if owner_references[0].kind == "ReplicaSet":
-                    replicaset = apps_v1.read_namespaced_replica_set(owner_references[0].name, namespace)
-                    deployment_name = replicaset.metadata.owner_references[0].name
+                    try:
+                        replicaset = apps_v1.read_namespaced_replica_set(owner_references[0].name, namespace)
+                        deployment_name = replicaset.metadata.owner_references[0].name
+                    except Exception as e:
+                        logger.error(f"Error while getting replicaset or deployment: {e}")
+                        continue
                     logger.info(f"Shall delete Deployment: {deployment_name}")
 
                 elif owner_references[0].kind == "Job":
