@@ -2,7 +2,7 @@ import os
 import time
 from datetime import datetime
 from kubernetes import client, config
-from kubernetes.client import AppsV1Api
+from kubernetes.client import AppsV1Api, BatchV1Api
 from prometheus_api_client import PrometheusConnect
 import logging
 from pytimeparse.timeparse import timeparse
@@ -24,6 +24,8 @@ def main():
 
     # set the respective environment variable as a label for workloads that shall not be deleted automatically
     FORBID_DELETE_LABEL = os.getenv("FORBID_DELETE_LABEL", "")
+    IGNORED_GPU_TYPES = [x.strip() for x in os.getenv("IGNORED_GPU_TYPES", "K80,P100").split(",")]
+
     if os.getenv("LOCAL_DEV", None) is not None:
         config.load_kube_config()
     else:
@@ -31,6 +33,7 @@ def main():
 
     core_v1 = client.CoreV1Api()
     apps_v1 = AppsV1Api()
+    batch_v1 = BatchV1Api()
 
     prom = PrometheusConnect(url="https://prometheus.datexis.com", disable_ssl=False)
 
@@ -56,12 +59,17 @@ def main():
 
             if pod.metadata.labels is not None:
                 if FORBID_DELETE_LABEL in pod.metadata.labels:
-                    logger.info(f"Dont delete: {pod_name} because it has the {FORBID_DELETE_LABEL} label")
+                    logger.info(f"Do not delete: {pod_name} because it has the {FORBID_DELETE_LABEL} label")
                     continue
 
             if value > 0.01:
-                logger.info(f"Dont delete: {pod_name} because it uses the GPU")
+                logger.info(f"Do not delete: {pod_name} because it uses the GPU")
                 continue
+
+            if pod.metadata.node_selector.gpu in IGNORED_GPU_TYPES:
+                logger.info(f"Do not delete: {pod_name} because it operates on ignored GPU types")
+
+
             if pod.status.container_statuses[0].state.running is not None:
                 try:
                     started_at_timestamp = pod.status.container_statuses[0].state.running.started_at
@@ -70,10 +78,11 @@ def main():
                     running_time = current_time - started_at_timestamp
                     if running_time.total_seconds() < timeparse(gpu_utilization_average_interval):
                         logger.info(
-                            f"Dont delete: {pod_name} because it runs only for {running_time.total_seconds()} seconds, shorter than {timeparse(gpu_utilization_average_interval)}")
+                            f"Do not delete: {pod_name} because it runs only for {running_time.total_seconds()} seconds, shorter than {timeparse(gpu_utilization_average_interval)}")
                         continue
                 except Exception as e:
                     logger.error(f"Could not get started-timestamp of pod: {pod_name}, exception: {e}")
+                    continue
             else:
                 # pod not running yet
                 continue
@@ -83,18 +92,29 @@ def main():
                     try:
                         replicaset = apps_v1.read_namespaced_replica_set(owner_references[0].name, namespace)
                         deployment_name = replicaset.metadata.owner_references[0].name
+                        apps_v1.delete_namespaced_deployment(deployment_name, namespace)
+                        logger.info(f"Deleted deployment: {deployment_name}")
                     except Exception as e:
-                        logger.error(f"Error while getting replicaset or deployment: {e}")
+                        logger.error(f"Exception while trying to delete deployment: {e}")
                         continue
-                    logger.info(f"Shall delete Deployment: {deployment_name}")
 
                 elif owner_references[0].kind == "Job":
                     # delete job object
-                    job_name = owner_references[0].name
-                    logger.info(f"Shall delete Job: {job_name}")
+                    try:
+                        job_name = owner_references[0].name
+                        batch_v1.delete_namespaced_job(job_name, namespace)
+                        logger.info(f"Deleted job: {job_name}")
+                    except Exception as e:
+                        logger.info(f"Exception while trying to delete job: {e}")
+                        continue
             else:
                 # delete pod directly
-                logger.info(f"Shall delete pod: {pod_name}")
+                try:
+                    core_v1.delete_namespaced_pod(pod_name)
+                    logger.info(f"Deleted: {pod_name}")
+                except Exception as e:
+                    logger.error(f"Exception: {e} Could not delete pod: {pod_name}")
+                    continue
         time.sleep(10)
 
 
