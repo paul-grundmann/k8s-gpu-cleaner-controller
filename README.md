@@ -28,6 +28,7 @@ The GPU Resource Manager can be configured using environment variables:
     GPU_UTIL_INTERVAL: The interval used to decide whether to delete workloads if idle (default is 1h).
     IMPORTANT_WORKLOADS: Comma-separated list of workload names that should not be deleted.
     FORBID_DELETE_LABEL: The label used to mark workloads that should not be deleted automatically.
+    IGNORED_GPU_TYPES: Comma separated list of GPU identifier keys where pod should not be deleted e.g. (K80, P100)
     LOGLEVEL: The loglevel used, default is INFO
     LOCAL_DEV: Set to 1 if you work locally. Required to decide from where to load the kubernetes client config
 ```
