@@ -2,15 +2,17 @@ import os
 import time
 from datetime import datetime
 from kubernetes import client, config
-from kubernetes.client import AppsV1Api, BatchV1Api
+from kubernetes.client import AppsV1Api, BatchV1Api, V1Pod
 from prometheus_api_client import PrometheusConnect
 import logging
+import sys
 from pytimeparse.timeparse import timeparse
 
 logging.basicConfig(
     level=os.environ.get('LOGLEVEL', 'INFO').upper(),
     datefmt='%Y-%m-%d %H:%M:%S',
-    format='%(asctime)s %(levelname)-8s %(message)s'
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ def main():
 
     while True:
         gpu_util_over_interval = prom.custom_query(
-            query=f"avg by (pod, namespace, gpu) (avg_over_time(dcgm_gpu_utilization[{gpu_utilization_average_interval}]))")
+            query=f"avg by (pod, namespace, gpu) (avg_over_time(DCGM_FI_DEV_GPU_UTIL[{gpu_utilization_average_interval}]))")
 
         # remove empty metrics
         gpu_util_over_interval = list(filter(lambda x: "pod" in x["metric"], gpu_util_over_interval))
@@ -51,7 +53,7 @@ def main():
             namespace = metric["metric"]["namespace"]
             value = float(metric["value"][1])
             try:
-                pod = core_v1.read_namespaced_pod(pod_name, namespace)
+                pod: V1Pod = core_v1.read_namespaced_pod(pod_name, namespace)
             except Exception as e:
                 logger.error(f"Exception while trying to get pod resource of pod {pod_name}. Exception: {e}")
                 continue
@@ -66,8 +68,10 @@ def main():
                 logger.info(f"Do not delete: {pod_name} because it uses the GPU")
                 continue
 
-            if pod.metadata.node_selector.gpu in IGNORED_GPU_TYPES:
+            print(pod.spec.node_selector["gpu"])
+            if any([pod.spec.node_selector["gpu"].lower() == gpu_type.lower() for gpu_type in IGNORED_GPU_TYPES]):
                 logger.info(f"Do not delete: {pod_name} because it operates on ignored GPU types")
+                continue
 
 
             if pod.status.container_statuses[0].state.running is not None:
@@ -105,12 +109,12 @@ def main():
                         batch_v1.delete_namespaced_job(job_name, namespace)
                         logger.info(f"Deleted job: {job_name}")
                     except Exception as e:
-                        logger.info(f"Exception while trying to delete job: {e}")
+                        logger.error(f"Exception while trying to delete job: {e}")
                         continue
             else:
                 # delete pod directly
                 try:
-                    core_v1.delete_namespaced_pod(pod_name)
+                    core_v1.delete_namespaced_pod(pod_name, namespace)
                     logger.info(f"Deleted: {pod_name}")
                 except Exception as e:
                     logger.error(f"Exception: {e} Could not delete pod: {pod_name}")
