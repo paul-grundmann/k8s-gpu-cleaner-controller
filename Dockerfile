@@ -1,7 +1,7 @@
-FROM python:3.12
-
+FROM python:3.13
 WORKDIR /controller
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+COPY pyproject.toml .
+RUN pip install uv
+RUN uv sync
 COPY src .
-CMD ["python3", "main.py"]
+CMD ["uv","run", "main.py"]
