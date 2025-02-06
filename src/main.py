@@ -68,10 +68,10 @@ def main():
                 logger.info(f"Do not delete: {pod_name} because it uses the GPU")
                 continue
 
-            print(pod.spec.node_selector["gpu"])
-            if any([pod.spec.node_selector["gpu"].lower() == gpu_type.lower() for gpu_type in IGNORED_GPU_TYPES]):
-                logger.info(f"Do not delete: {pod_name} because it operates on ignored GPU types")
-                continue
+            if "gpu" in pod.spec.node_selector:
+                if any([pod.spec.node_selector["gpu"].lower() == gpu_type.lower() for gpu_type in IGNORED_GPU_TYPES]):
+                    logger.info(f"Do not delete: {pod_name} because it operates on ignored GPU types")
+                    continue
 
 
             if pod.status.container_statuses[0].state.running is not None:
@@ -101,7 +101,6 @@ def main():
                     except Exception as e:
                         logger.error(f"Exception while trying to delete deployment: {e}")
                         continue
-
                 elif owner_references[0].kind == "Job":
                     # delete job object
                     try:
