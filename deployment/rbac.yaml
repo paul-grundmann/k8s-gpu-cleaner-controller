@@ -13,13 +13,13 @@ metadata:
 rules:
 - apiGroups: ["apps"]
   resources: ["deployments", "replicasets"]
-  verbs: ["get", "list", "delete"]
+  verbs: ["get", "list", "delete"] # Add delete if everything else works
 - apiGroups: ["batch"]
   resources: ["jobs"]
-  verbs: ["get", "list", "delete"]
+  verbs: ["get", "list", "delete"] # Add delete if everything else works
 - apiGroups: [""]
   resources: ["pods"]
-  verbs: ["get", "list", "delete"]
+  verbs: ["get", "list", "delete"] # Add delete if everything else works
 
 ---
 
