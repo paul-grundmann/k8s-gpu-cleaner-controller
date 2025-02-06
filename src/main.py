@@ -68,10 +68,11 @@ def main():
                 logger.info(f"Do not delete: {pod_name} because it uses the GPU")
                 continue
 
-            if "gpu" in pod.spec.node_selector:
-                if any([pod.spec.node_selector["gpu"].lower() == gpu_type.lower() for gpu_type in IGNORED_GPU_TYPES]):
-                    logger.info(f"Do not delete: {pod_name} because it operates on ignored GPU types")
-                    continue
+            if hasattr(pod.spec, 'node_selector'):
+                if pod.spec.node_selector is not None:
+                    if any([pod.spec.node_selector["gpu"].lower() == gpu_type.lower() for gpu_type in IGNORED_GPU_TYPES]):
+                        logger.info(f"Do not delete: {pod_name} because it operates on ignored GPU types")
+                        continue
 
 
             if pod.status.container_statuses[0].state.running is not None:
