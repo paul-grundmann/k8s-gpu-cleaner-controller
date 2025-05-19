@@ -2,9 +2,10 @@
 name = "k8s-gpu-cleaner-controller"
 version = "0.3.17"
 description = "Add your description here"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "kubernetes>=30.1.0",
     "prometheus-api-client>=0.5.5",
     "pytimeparse>=1.1.8",
+    "pip-system-certs>=4.0"
 ]
