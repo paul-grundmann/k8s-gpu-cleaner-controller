@@ -7,6 +7,9 @@ from prometheus_api_client import PrometheusConnect
 import logging
 import sys
 from pytimeparse.timeparse import timeparse
+import uuid
+from datetime import datetime
+import pytz
 
 logging.basicConfig(
     level=os.environ.get('LOGLEVEL', 'INFO').upper(),
@@ -70,9 +73,10 @@ def main():
 
             if hasattr(pod.spec, 'node_selector'):
                 if pod.spec.node_selector is not None:
-                    if any([pod.spec.node_selector["gpu"].lower() == gpu_type.lower() for gpu_type in IGNORED_GPU_TYPES]):
-                        logger.info(f"Do not delete: {pod_name} because it operates on ignored GPU types")
-                        continue
+                    if "gpu" in pod.spec.node_selector:
+                        if any([pod.spec.node_selector["gpu"].lower() == gpu_type.lower() for gpu_type in IGNORED_GPU_TYPES]):
+                            logger.info(f"Do not delete: {pod_name} because it operates on ignored GPU types")
+                            continue
 
 
             if pod.status.container_statuses[0].state.running is not None:
@@ -97,8 +101,33 @@ def main():
                     try:
                         replicaset = apps_v1.read_namespaced_replica_set(owner_references[0].name, namespace)
                         deployment_name = replicaset.metadata.owner_references[0].name
-                        apps_v1.delete_namespaced_deployment(deployment_name, namespace)
-                        logger.info(f"Deleted deployment: {deployment_name}")
+                        apps_v1.patch_namespaced_deployment_scale(name, namespace,{'spec': {'replicas': 0}})
+                        logger.info(f"Scaled down deployment: {deployment_name}")
+                        event_metadata = client.V1ObjectMeta(
+                            name=f"{deployment_name}.{str(uuid.uuid4())}",
+                            namespace=namespace
+                        )
+
+                        # Reference the Deployment in involvedObject
+                        involved_object = client.V1ObjectReference(
+                            api_version="apps/v1",
+                            kind="Deployment",
+                            name=deployment.metadata.name,
+                            namespace=namespace,
+                            uid=deployment.metadata.uid
+                        )
+
+                        # Create the Event
+                        event = client.CoreV1Event(
+                            metadata=event_metadata,
+                            involved_object=involved_object,
+                            first_timestamp=datetime.now(pytz.utc),
+                            reason="IdleGPUScaledownEvent",
+                            message="The deployment was scaled down to 0 replicas after detecting over four hours of GPU inactivity.",
+                            type="Warning"
+                        )
+                        core_v1.create_namespaced_event(namespace=namespace, body=event)
+                        logger.info(f"Created event with scaledown notification for deployment: {deployment_name}")
                     except Exception as e:
                         logger.error(f"Exception while trying to delete deployment: {e}")
                         continue

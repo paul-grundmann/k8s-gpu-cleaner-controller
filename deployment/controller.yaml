@@ -20,7 +20,7 @@ spec:
       serviceAccountName: gpu-cleaner-controller
       containers:
       - name: gpu-cleaner-controller
-        image: registry.datexis.com/pgrundmann/gpu-idle-controller:0.3.20
+        image: registry.datexis.com/pgrundmann/gpu-idle-controller:0.3.22
         env:
         - name: LOGLEVEL
           value: "INFO"
