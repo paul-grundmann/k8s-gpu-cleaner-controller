@@ -123,7 +123,7 @@ def main():
                             involved_object=involved_object,
                             first_timestamp=datetime.now(pytz.utc),
                             reason="IdleGPUScaledownEvent",
-                            message="The deployment was scaled down to 0 replicas after detecting over four hours of GPU inactivity.",
+                            message=f"The deployment was scaled down to 0 replicas after detecting over {gpu_utilization_average_interval} of GPU inactivity.",
                             type="Warning"
                         )
                         core_v1.create_namespaced_event(namespace=namespace, body=event)
