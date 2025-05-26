@@ -15,7 +15,7 @@ logging.basicConfig(
     level=os.environ.get('LOGLEVEL', 'INFO').upper(),
     datefmt='%Y-%m-%d %H:%M:%S',
     format='%(asctime)s %(levelname)-8s %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)]
+    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler('/tmp/gpu-cleaner.log')]
 )
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ def main():
     important_deployments_not_to_delete = os.getenv("IMPORTANT_WORKLOADS", "")
 
     # set the respective environment variable as a label for workloads that shall not be deleted automatically
-    FORBID_DELETE_LABEL = os.getenv("FORBID_DELETE_LABEL", "")
+    FORBID_DELETE_LABEL = os.getenv("FORBID_DELETE_LABEL", "ALLOW-GPU-IDLE")
     IGNORED_GPU_TYPES = [x.strip() for x in os.getenv("IGNORED_GPU_TYPES", "K80,P100").split(",")]
 
     if os.getenv("LOCAL_DEV", None) is not None:
@@ -101,7 +101,7 @@ def main():
                     try:
                         replicaset = apps_v1.read_namespaced_replica_set(owner_references[0].name, namespace)
                         deployment_name = replicaset.metadata.owner_references[0].name
-                        apps_v1.patch_namespaced_deployment_scale(name, namespace,{'spec': {'replicas': 0}})
+                        apps_v1.patch_namespaced_deployment_scale(deployment_name, namespace,{'spec': {'replicas': 0}})
                         logger.info(f"Scaled down deployment: {deployment_name}")
                         event_metadata = client.V1ObjectMeta(
                             name=f"{deployment_name}.{str(uuid.uuid4())}",
@@ -112,7 +112,7 @@ def main():
                         involved_object = client.V1ObjectReference(
                             api_version="apps/v1",
                             kind="Deployment",
-                            name=deployment.metadata.name,
+                            name=deployment_name,
                             namespace=namespace,
                             uid=deployment.metadata.uid
                         )

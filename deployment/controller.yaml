@@ -20,12 +20,14 @@ spec:
       serviceAccountName: gpu-cleaner-controller
       containers:
       - name: gpu-cleaner-controller
-        image: registry.datexis.com/pgrundmann/gpu-idle-controller:0.3.22
+        image: registry.datexis.com/pgrundmann/gpu-idle-controller:0.3.27
         env:
         - name: LOGLEVEL
           value: "INFO"
         - name: GPU_UTIL_INTERVAL
           value: "4h"
+        - name: FORBID_DELETE_LABEL
+          value: "ALLOW-GPU-IDLE"
         resources:
           requests:
             cpu: "10m"
