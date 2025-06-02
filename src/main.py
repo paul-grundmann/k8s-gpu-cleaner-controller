@@ -28,8 +28,10 @@ def main():
     important_deployments_not_to_delete = os.getenv("IMPORTANT_WORKLOADS", "")
 
     # set the respective environment variable as a label for workloads that shall not be deleted automatically
-    FORBID_DELETE_LABEL = os.getenv("FORBID_DELETE_LABEL", "ALLOW-GPU-IDLE")
-    IGNORED_GPU_TYPES = [x.strip() for x in os.getenv("IGNORED_GPU_TYPES", "K80,P100").split(",")]
+    FORBID_DELETE_LABEL = os.getenv("FORBID_DELETE_LABEL", "gpu-cleaner:allow-gpu-idle")
+    FORBID_DELETE_LABEL_KEY, FORBID_DELETE_LABEL_VALUE = FORBID_DELETE_LABEL.split(":")
+
+    IGNORED_GPU_TYPES = [x.strip() for x in os.getenv("IGNORED_GPU_TYPES", "K80,P100,L40").split(",")]
 
     if os.getenv("LOCAL_DEV", None) is not None:
         config.load_kube_config()
@@ -63,9 +65,10 @@ def main():
             owner_references = pod.metadata.owner_references
 
             if pod.metadata.labels is not None:
-                if FORBID_DELETE_LABEL in pod.metadata.labels:
-                    logger.info(f"Do not delete: {pod_name} because it has the {FORBID_DELETE_LABEL} label")
-                    continue
+                if FORBID_DELETE_LABEL_KEY in pod.metadata.labels:
+                    if FORBID_DELETE_LABEL_VALUE == pod.metadata.labels[FORBID_DELETE_LABEL_KEY]:
+                        logger.info(f"Do not delete: {pod_name} because it has the {FORBID_DELETE_LABEL} label")
+                        continue
 
             if value > 0.01:
                 logger.info(f"Do not delete: {pod_name} because it uses the GPU")
