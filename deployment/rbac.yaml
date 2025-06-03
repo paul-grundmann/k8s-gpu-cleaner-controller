@@ -12,7 +12,7 @@ metadata:
   name: gpu-cleaner-controller
 rules:
 - apiGroups: ["apps"]
-  resources: ["deployments", "replicasets"]
+  resources: ["deployments", "replicasets", "deployments/scale"]
   verbs: ["get", "list", "patch"] # Add delete if everything else works
 - apiGroups: ["batch"]
   resources: ["jobs"]
